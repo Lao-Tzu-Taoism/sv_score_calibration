@@ -139,6 +139,8 @@ Cllr = 1/(2xlog(2)) * ( sum(log(1+1/s)) / Ntar + sum(log(1+s)) / Nnon)
 * http://www.cs.joensuu.fi/pages/franti/sipu/pub/Score_calibration_Mandasari_2014.pdf
 * https://arxiv.org/pdf/2002.03802.pdf
 * https://www.kth.se/polopoly_fs/1.731834.1550156159!/HenrikBostrom_Slides.pdf
+* https://medium.com/@kingsubham27/calibration-techniques-and-its-importance-in-machine-learning-71bec997b661
 
 * https://github.com/fabiankueppers/calibration-framework.git
+* https://github.com/SubhamIO/Calibration-Techniques-in-Machine-Learning
 * https://github.com/donlnz/nonconformist
