@@ -10,6 +10,8 @@ from calibrate_scores import LinearModel
 
 if __name__ == "__main__":
   parser = argparse.ArgumentParser("Apply calibration model to LLR scores")
+  parser.add_argument('--label-column', metavar='label_column', type=int, default=3, choices=[1,3], help="label column")
+  parser.add_argument('--log-llr', action='store_true', default=False, help="convert score to [0, 1] and log")
   parser.add_argument('model')
   parser.add_argument('input_score_file', nargs='+', help="One or more input score files. Each line is a triple <enrolled_speaker> <test_speaker> <LLR_score>") 
   parser.add_argument('output_score_file')
@@ -26,7 +28,18 @@ if __name__ == "__main__":
     input_keys_and_scores = []
     for l in open(input_score_file):
       ss = l.split()
-      input_keys_and_scores.append((ss[0] + " " + ss[1], float(ss[2])))
+      if args.label_column == 3:
+        key = ss[0] + " " + ss[1]
+        score = float(ss[2])
+      elif args.label_column == 1:
+        key = ss[1] + " " + ss[2]
+        score = float(ss[0])
+      else:
+        raise Exception("Illegal label column: %d" % args.label_column)
+      if args.log_llr:
+        score = (score + 1) / 2
+        score = np.log(score)
+      input_keys_and_scores.append((key, score))
 
     if input_tensor is None:
       input_tensor = torch.tensor([i[1] for i in input_keys_and_scores], dtype=torch.float64).reshape(-1, 1)
@@ -37,4 +50,9 @@ if __name__ == "__main__":
 
   with open(args.output_score_file, "w") as f_out:
     for i, s in enumerate(input_keys_and_scores):
-      print(s[0], output_tensor[i].item(), file=f_out)
+      if args.label_column == 3:
+        print(s[0], output_tensor[i].item(), file=f_out)
+      elif args.label_column == 1:
+        print(output_tensor[i].item(), s[0], file=f_out)
+      else:
+        raise Exception("Illegal label column: %d" % args.label_column)

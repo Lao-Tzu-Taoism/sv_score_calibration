@@ -34,18 +34,28 @@ if __name__ == "__main__":
   parser = argparse.ArgumentParser("Calibrates speaker verification LLR scores")
   parser.add_argument('--save-model', help="Save calibration model to this file")
   parser.add_argument('--max-epochs', default=50)
+  parser.add_argument('--label-column', metavar='label_column', type=int, default=3, choices=[1,3], help="label column")
+  parser.add_argument('--log-llr', action='store_true', default=False, help="convert score to [0, 1] and log")
   parser.add_argument('key_file', help="Speaker recognition key file. Each line is a triple <enrolled_speaker> <test_speaker> target|nontarget")
   parser.add_argument('score_file', nargs='+', help="One or more score files. Each line is a triple <enrolled_speaker> <test_speaker> <LLR_score>")
 
   args = parser.parse_args()
+  print(args)
 
   keys = {}
   for l in open(args.key_file):
     ss = l.split()
-    trial = ss[0] + " " + ss[1]
-    if ss[2] == "tgt" or ss[2] == "target":
+    if args.label_column == 3:
+      trial = ss[0] + " " + ss[1]
+      score = ss[2]
+    elif args.label_column == 1:
+      trial = ss[1] + " " + ss[2]
+      score = ss[0]
+    else:
+        raise Exception("Illegal label column: %d" % args.label_column)
+    if score == "tgt" or score == "target" or score == "1":
       is_target = True
-    elif ss[2] == "imp" or ss[2] == "nontarget":
+    elif score == "imp" or score == "nontarget" or score == "0":
       is_target = False
     else:
       raise Exception("Illegal line in key file:\n%s" % l.strip())
@@ -59,11 +69,21 @@ if __name__ == "__main__":
 
     for l in open(score_file):
       ss = l.split()
-      trial = ss[0] + " " + ss[1]
-      if keys[trial]:
-        target_llrs_list.append(float(ss[2]))
+      if args.label_column == 3:
+        trial = ss[0] + " " + ss[1]
+        score = float(ss[2])
+      elif args.label_column == 1:
+        score = float(ss[0])
+        trial = ss[1] + " " + ss[2]
       else:
-        nontarget_llrs_list.append(float(ss[2]))
+        raise Exception("Illegal label column: %d" % args.label_column)
+      if args.log_llr:
+        score = (score + 1) / 2
+        score = np.log(score)
+      if keys[trial]:
+        target_llrs_list.append(score)
+      else:
+        nontarget_llrs_list.append(score)
 
     if target_llrs is None:
       target_llrs = torch.tensor(target_llrs_list, dtype=torch.float64).reshape(-1, 1)
