@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# ./bin/greedyFusion.sh veri_test.txt score.list ./tmp
+
 set -e
 
 mod=svm # lda | svm | equal
