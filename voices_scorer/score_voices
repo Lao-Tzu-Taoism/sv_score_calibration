@@ -1,0 +1,38 @@
+#!/usr/bin/env python
+"""
+Scoring script for VOiCES from a Distance Challenge
+
+Author: Mitchell McLaren
+Email: mitchell.mclaren@sri.com
+Date: January 7. 2016 (v2 SITW scoring script)
+Date: January 23, 2019 (revised for VOiCES)
+"""
+import os, sys, time
+
+from optparse import OptionParser
+from voices_tools import *
+
+if(__name__=="__main__"):
+    usage = "%prog [options] scorefile keyfile/triallist"
+    desc = "Evaluate performance of a scorefile against a key, or check a score submission against a trial list (with -c option)."
+    version = "%prog 1.0"
+    parser = OptionParser(usage=usage,description=desc,version=version)
+    parser.add_option("-c", "--check", action="store_true", help="Check submission against a trial list",default=False)
+    opt, args = parser.parse_args()
+    scorefile, keyfile = args
+
+    # Load the scores from ascii file
+    scores = Scores.load(scorefile)
+
+    # Load the key file
+    key = Key.load(keyfile, notruth=opt.check)
+    
+    # Align the score and key in terms of model and test id ordering
+    # An exception will be raised if any scores are missing according to the key
+    scores = scores.align(key)
+
+    if opt.check:
+        print "Submission check PASSED"
+    else:
+        # Calculate and print performance metrics
+        print_performance(scores,key,p_tar=0.01)
