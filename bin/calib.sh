@@ -13,7 +13,7 @@ log() {
 }
 
 tag="defualt"
-model=calib.pt # model ckpt
+model=model.pt # model ckpt
 trails=trails  # SV trails
 score_files=  #list of str or str
 calib_file=score_${tag}.calib # calibration scores
@@ -33,7 +33,4 @@ python apply_calibration.py  \
   $score_files \
   $calib_file
 
-python ./VoxSRC2020/compute_min_dcf.py  --p-target 0.05 --c-miss 1 --c-fa 1 $calib_file  $trails 
-python ./VoxSRC2020/compute_EER.py  --ground_truth $trails --prediction  $calib_file
-
-python voices_scorer/score_voices --label-column 1 --p-target 0.05 $calib_file $trails
+./bin/metric.sh $trails $calib_file
