@@ -133,7 +133,9 @@ Cllr = 1/(2xlog(2)) * ( sum(log(1+1/s)) / Ntar + sum(log(1+s)) / Nnon)
      =  0.5 * (mean(log(1+1/s_tar)) + mean(log(1+s_non))) / log(2)
      = 0.5 * (mean(neg_log_sigmoid(s_tar_llr)) + mean(neg_log_sigmoid(-s_non_llr))) / log(2)
 ```
+
 ## Refs
+* https://github.com/a-nagrani/VoxSRC2020.git
 
 ### Calibration
 * http://www.cs.joensuu.fi/pages/franti/sipu/pub/Score_calibration_Mandasari_2014.pdf

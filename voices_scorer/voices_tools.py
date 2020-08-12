@@ -50,7 +50,7 @@ class Key(object):
         self.name=name
 
     @classmethod
-    def load(self, filename, notruth=False):
+    def load(self, filename, notruth=False, label_column=3):
         """ Build Key from a text file with the following format
         trainID testID tgt/imp
         If notruth is True, then load a trial list for submission checking:
@@ -60,17 +60,30 @@ class Key(object):
         with func(filename) as f:
             L = [line.strip().split(' ')[0:3] for line in f]
         L.sort()
-        if notruth:
-            try:
-                trainids, testids = map(lambda t: list(set(t)), zip(*L))
-            except ValueError as e:
-                raise Exception("Need 2 columns for a trial list. Did you pass a key instead? If scoring a file with a key, don't use -c on score_voices.")
+        if label_column == 3:
+            if notruth:
+                try:
+                    trainids, testids = [list(set(t)) for t in zip(*L)]
+                except ValueError as e:
+                    raise Exception("Need 2 columns for a trial list. Did you pass a key instead? If scoring a file with a key, don't use -c on score_voices.")
+            else:
+                try:
+                    trainids, testids, _ = [list(set(t)) for t in zip(*L)]
+                except ValueError as e:
+                    raise Exception("Need 3 columns for a key. Did you pass a trial list? If checking a submission, use score_voices -c.")
+        elif label_column == 1:
+            if notruth:
+                try:
+                    trainids, testids = [list(set(t)) for t in zip(*L)]
+                except ValueError as e:
+                    raise Exception("Need 2 columns for a trial list. Did you pass a key instead? If scoring a file with a key, don't use -c on score_voices.")
+            else:
+                try:
+                    _, trainids, testids = [list(set(t)) for t in zip(*L)]
+                except ValueError as e:
+                    raise Exception("Need 3 columns for a key. Did you pass a trial list? If checking a submission, use score_voices -c.")
         else:
-            try:
-                trainids, testids, _ = map(lambda t: list(set(t)), zip(*L))
-            except ValueError as e:
-                raise Exception("Need 3 columns for a key. Did you pass a trial list? If checking a submission, use score_voices -c.")
-
+            raise Exception(f"not support label column: {label_column}")
         idxtrainids = dict([(x,i) for i,x in enumerate(trainids)])
         idxtestids = dict([(x,i) for i,x in enumerate(testids)])
         nbT, nbt = len(trainids), len(testids)
@@ -78,11 +91,24 @@ class Key(object):
         # default mask to have all trials not included ('0')
         mask = np.zeros((nbT, nbt),dtype=np.int8)
         for trial in L:
-            if notruth: # For submission checking
-                mask[idxtrainids[trial[0]], idxtestids[trial[1]]] = 2
+            if label_column == 3:
+                if notruth: # For submission checking
+                    mask[idxtrainids[trial[0]], idxtestids[trial[1]]] = 2
+                else:
+                    if trial[2] == "tgt" or trial[2] == 'target' or trial[2] == '1':
+                        mask[idxtrainids[trial[0]], idxtestids[trial[1]]] = 1
+                    if trial[2] == "imp" or trial[2] == 'nontarget' or trial[2] == '0':
+                        mask[idxtrainids[trial[0]], idxtestids[trial[1]]] = -1
+            elif label_column == 1:
+                if notruth: # For submission checking
+                    mask[idxtrainids[trial[1]], idxtestids[trial[2]]] = 2
+                else:
+                    if trial[0] == "tgt" or trial[0] == 'target' or trial[0] == '1':
+                        mask[idxtrainids[trial[1]], idxtestids[trial[2]]] = 1
+                    if trial[0] == "imp" or trial[0] == 'nontarget' or trial[0] == '0':
+                        mask[idxtrainids[trial[1]], idxtestids[trial[2]]] = -1
             else:
-                if trial[2] == "tgt": mask[idxtrainids[trial[0]], idxtestids[trial[1]]] = 1
-                if trial[2] == "imp": mask[idxtrainids[trial[0]], idxtestids[trial[1]]] = -1
+                raise Exception(f"not support label column: {label_column}")
         return Key(trainids, testids, mask, os.path.basename(filename))
 
 
@@ -107,7 +133,7 @@ class Scores(object):
         self.name=name
 
     @classmethod
-    def load(cls, filename):
+    def load(cls, filename, label_column=3):
         """ Build Scores from a text file with the following format
         trainID testID score
         filename can be ascii or gzip ascii with .gz extension
@@ -116,7 +142,12 @@ class Scores(object):
         with func(filename) as f:
             L = [line.strip().split(' ')[0:3] for line in f]
         L.sort()
-        trainids, testids, _ = map(lambda t: list(set(t)), zip(*L))
+        if label_column == 3:
+            trainids, testids, _ = [list(set(t)) for t in zip(*L)]
+        elif label_column == 1:
+            _, trainids, testids = [list(set(t)) for t in zip(*L)]
+        else:
+            raise Exception(f"not support label column: {label_column}")
         idxtrainids = dict([(x,i) for i,x in enumerate(trainids)])
         idxtestids = dict([(x,i) for i,x in enumerate(testids)])
         nbT, nbt = len(trainids), len(testids)
@@ -125,12 +156,22 @@ class Scores(object):
         score_mask = np.zeros((nbT, nbt),dtype=np.int8)
         score_mat = np.NINF * np.ones((nbT, nbt),dtype='f')
         for trial in L:
-            score_mask[idxtrainids[trial[0]], idxtestids[trial[1]]] = 1
-            if score_mat[idxtrainids[trial[0]], idxtestids[trial[1]]] == np.NINF:
-                score_mat[idxtrainids[trial[0]], idxtestids[trial[1]]] = trial[2]
+            if label_column == 3:
+                score_mask[idxtrainids[trial[0]], idxtestids[trial[1]]] = 1
+                if score_mat[idxtrainids[trial[0]], idxtestids[trial[1]]] == np.NINF:
+                    score_mat[idxtrainids[trial[0]], idxtestids[trial[1]]] = trial[2]
+                else:
+                    # Being re-defined!
+                    raise Exception("Trial [%s %s] appears more than once in the score file!" % (trial[0],trial[1]))
+            elif label_column == 1:
+                score_mask[idxtrainids[trial[1]], idxtestids[trial[2]]] = 1
+                if score_mat[idxtrainids[trial[1]], idxtestids[trial[2]]] == np.NINF:
+                    score_mat[idxtrainids[trial[1]], idxtestids[trial[2]]] = trial[0]
+                else:
+                    # Being re-defined!
+                    raise Exception("Trial [%s %s] appears more than once in the score file!" % (trial[1],trial[2]))
             else:
-                # Being re-defined!
-                raise Exception("Trial [%s %s] appears more than once in the score file!" % (trial[0],trial[1]))
+                raise Exception(f"not support label column: {label_column}")
         return Scores(trainids, testids, score_mat, score_mask, os.path.basename(filename))
 
 
@@ -152,12 +193,12 @@ class Scores(object):
         # CHECKS to confirm all trials are represented
         if(np.sum(hasmodel) < nb_models):
             if np.sum(hasmodel)==0:
-                print "#####################"
-                print "No valid models found in score file! Perhaps you passed the wrong score file or the model format is incorrect. The key expected sometime like:"
-                print [x for x in sorted(key.train_ids)[:5]]
-                print "and your scorefile contains (e.g.):"
-                print [x for x in sorted(self.train_ids)[:5]]
-                print "#####################"
+                print("#####################")
+                print("No valid models found in score file! Perhaps you passed the wrong score file or the model format is incorrect. The key expected sometime like:")
+                print([x for x in sorted(key.train_ids)[:5]])
+                print("and your scorefile contains (e.g.):")
+                print([x for x in sorted(self.train_ids)[:5]])
+                print("#####################")
                 raise Exception("No valid models in score file!")
             else:
                 raise Exception("Missing %d models from your score file. Found %d but expected %d." \
@@ -165,12 +206,12 @@ class Scores(object):
 
         if(np.sum(hasseg) < nb_tests):
             if np.sum(hasseg)==0:
-                print "#####################"
-                print "No valid test segments found in score file! Perhaps you passed the wrong score file or the test format is incorrect. The key expected sometime like:"
-                print [x for x in sorted(key.test_ids)[:5]]
-                print "and your scorefile contains (e.g.):"
-                print [x for x in sorted(self.test_ids)[:5]]
-                print "#####################"
+                print("#####################")
+                print("No valid test segments found in score file! Perhaps you passed the wrong score file or the test format is incorrect. The key expected sometime like:")
+                print([x for x in sorted(key.test_ids)[:5]])
+                print("and your scorefile contains (e.g.):")
+                print([x for x in sorted(self.test_ids)[:5]])
+                print("#####################")
                 raise Exception("No valid test segments in score file!")
             else:
                 raise Exception("Missing %d test segments from your score file. Found %d but expected %d." \
@@ -208,11 +249,11 @@ def print_performance(scores,key,p_tar=0.01):
     """
     ascores = scores.align(key)
     Pfa,Pmiss,sortedscores,tar,non = det(ascores,key)
-    print "minDCF   : %.4f" % (get_min_dcf(Pfa, Pmiss, p_tar=p_tar))
-    print "actDCF   : %.4f" % (get_act_dcf(Pfa, Pmiss, sortedscores, p_tar=p_tar))
-    print "avgRPrec : %.4f" % (get_avg_rprecision(scores,key))
-    print "EER      : %.4f" % (get_eer(Pfa, Pmiss))
-    print "Cllr     : %.4f" % (get_cllr(tar,non))
+    print("minDCF   : %.4f" % (get_min_dcf(Pfa, Pmiss, p_tar=p_tar)))
+    print("actDCF   : %.4f" % (get_act_dcf(Pfa, Pmiss, sortedscores, p_tar=p_tar)))
+    print("avgRPrec : %.4f" % (get_avg_rprecision(scores,key)))
+    print("EER      : %.4f" % (get_eer(Pfa, Pmiss)))
+    print("Cllr     : %.4f" % (get_cllr(tar,non)))
 
 
 def get_eer(Pfa,Pmiss):
