@@ -44,6 +44,9 @@ def get_args():
                              "If true, select top n enroll/test keys by test/enroll_cohort scores. "
                              "If false, select top n enroll/test keys by enroll/test_cohort scores.")
 
+    parser.add_argument("--score-column", type=int, default=3,
+                        help="score is in `score_column` cloumn")
+
     parser.add_argument("input_score", metavar="enroll-test-score", type=str,
                         help="Original score path for <enroll, test>.")
 
@@ -60,14 +63,20 @@ def get_args():
 
     return args
 
-def load_score(score_path, names, sep=" "):
+def load_score(score_path, names, sep=" ", args=None):
     logger.info("Load score form {} ...".format(score_path))
+    if args.score_column == 1:
+       names = names[-1:] + names[:-1]
     df = pd.read_csv(score_path, sep=sep, names=names)
     return df
 
-def save_score(score, score_path, sep=" "):
+def save_score(score, score_path, sep=" ", args=None):
     logger.info("Save score to {} ...".format(score_path))
     df = pd.DataFrame(score)
+    if args.score_column == 1:
+        cols = df.columns.tolist()
+        cols = cols[-1:] + cols[:-1]
+        df = df[cols]
     df.to_csv(score_path, header=None, sep=sep, index=False)
 
 def snorm(args):
@@ -83,9 +92,9 @@ def snorm(args):
         enroll_cohort_names = ["cohort", "enroll", "score"]
         test_cohort_names = ["cohort", "test", "score"]
 
-    input_score = load_score(args.input_score, enroll_test_names)
-    enroll_cohort_score = load_score(args.enroll_cohort_score, enroll_cohort_names)
-    test_cohort_score = load_score(args.test_cohort_score, test_cohort_names)
+    input_score = load_score(args.input_score, enroll_test_names, args=args)
+    enroll_cohort_score = load_score(args.enroll_cohort_score, enroll_cohort_names, args=args)
+    test_cohort_score = load_score(args.test_cohort_score, test_cohort_names, args=args)
 
     output_score = []
 
@@ -101,13 +110,18 @@ def snorm(args):
     test_std = test_group["score"].std()
 
     for _, row in input_score.iterrows():
-        enroll_key, test_key, score = row
+        if args.score_column == 3:
+            enroll_key, test_key, score = row
+        elif args.score_column == 1:
+            score, enroll_key, test_key = row
+        else:
+            raise ValueError("not support")
         normed_score = 0.5 * ((score - enroll_mean[enroll_key]) / enroll_std[enroll_key] + \
                        (score - test_mean[test_key]) / test_std[test_key])
         output_score.append([enroll_key, test_key, normed_score])
 
     logger.info("Normalize scores done.")
-    save_score(output_score, args.output_score)
+    save_score(output_score, args.output_score, args=args)
 
 def asnorm(args):
     """ Adaptive Symmetrical Normalization.
@@ -128,9 +142,9 @@ def asnorm(args):
         enroll_cohort_names = ["cohort", "enroll", "score"]
         test_cohort_names = ["cohort", "test", "score"]
 
-    input_score = load_score(args.input_score, enroll_test_names)
-    enroll_cohort_score = load_score(args.enroll_cohort_score, enroll_cohort_names)
-    test_cohort_score = load_score(args.test_cohort_score, test_cohort_names)
+    input_score = load_score(args.input_score, enroll_test_names, args=args)
+    enroll_cohort_score = load_score(args.enroll_cohort_score, enroll_cohort_names, args=args)
+    test_cohort_score = load_score(args.test_cohort_score, test_cohort_names, args=args)
 
     output_score = []
 
@@ -166,7 +180,12 @@ def asnorm(args):
     test_std = test_group["score"].std()
 
     for _, row in input_score.iterrows():
-        enroll_key, test_key, score = row
+        if args.score_column == 3:
+            enroll_key, test_key, score = row
+        elif args.score_column == 1:
+            score, enroll_key, test_key = row
+        else:
+            raise ValueError("not support")
         if args.cross_select == "true":
             normed_score = 0.5 * ((score - enroll_mean[enroll_key, test_key]) / enroll_std[enroll_key, test_key] + \
                                  (score - test_mean[enroll_key, test_key]) / test_std[enroll_key, test_key])
@@ -176,7 +195,7 @@ def asnorm(args):
         output_score.append([enroll_key, test_key, normed_score])
 
     logger.info("Normalize scores done.")
-    save_score(output_score, args.output_score)
+    save_score(output_score, args.output_score, args=args)
 
 def main():
     print(" ".join(sys.argv))
