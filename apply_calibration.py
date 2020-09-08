@@ -8,6 +8,10 @@ import argparse
 import numpy as np
 from calibrate_scores import LinearModel
 
+
+def sigmoid(x):
+    return torch.sigmoid(torch.tensor(x, dtype=torch.float32)).numpy()
+
 if __name__ == "__main__":
   parser = argparse.ArgumentParser("Apply calibration model to LLR scores")
   parser.add_argument('--label-column', metavar='label_column', type=int, default=3, choices=[1,3], help="label column")
@@ -37,7 +41,8 @@ if __name__ == "__main__":
       else:
         raise Exception("Illegal label column: %d" % args.label_column)
       if args.log_llr:
-        score = (score + 1) / 2
+        #score = (score + 1) / 2
+        score = sigmoid(score)
         score = np.log(score)
       input_keys_and_scores.append((key, score))
 

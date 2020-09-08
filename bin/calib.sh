@@ -22,13 +22,15 @@ log "$0 $*"
 . ./bin/parse_options.sh
 
 python calibrate_scores.py \
-  --label-column 1 --log-llr \
+  --label-column 1 \
+  --log-llr \
   --save-model $model \
   $trails \
   $score_files
 
 python apply_calibration.py  \
-  --label-column 1 --log-llr  \
+  --label-column 1 \
+  --log-llr  \
   $model  \
   $score_files \
   $calib_file

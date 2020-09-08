@@ -30,6 +30,10 @@ def cllr(target_llrs, nontarget_llrs):
     return 0.5 * (torch.mean(negative_log_sigmoid(target_llrs)) + torch.mean(negative_log_sigmoid(-nontarget_llrs)))/np.log(2)
 
 
+def sigmoid(x):
+    return torch.sigmoid(torch.tensor(x, dtype=torch.float32)).numpy()
+
+
 if __name__ == "__main__":
   parser = argparse.ArgumentParser("Calibrates speaker verification LLR scores")
   parser.add_argument('--save-model', help="Save calibration model to this file")
@@ -78,7 +82,7 @@ if __name__ == "__main__":
       else:
         raise Exception("Illegal label column: %d" % args.label_column)
       if args.log_llr:
-        score = (score + 1) / 2
+        score = sigmoid(score)
         score = np.log(score)
       if keys[trial]:
         target_llrs_list.append(score)
