@@ -1,12 +1,9 @@
 #!/usr/bin/env python
-# -*- coding:utf-8 -*-
-
-# Copyright xmuspeech (Author:Snowdar 2018-09-18)
-
 import sys,os,math
 from sklearn import svm
 from scipy import interpolate
 import numpy as np
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 
 def sigmoid(x):
     return 1/(1+np.exp(-x))
@@ -55,6 +52,8 @@ options={
 "write_weight":"",
 "normalize":True,
 "confidence":False,
+"svm": False,
+"lda": False,
 "label_column":"1"}
 
 n=1
@@ -73,13 +72,16 @@ if len(sys.argv)-n != 3 :
     print('e.g.: '+sys.argv[0]+' --write-weight=test_1s/fusion.weight test_1s/trials test_1s/score.scp test_1s/fusion.score')
     exit(1)
 
+print(options)
 print("begin")
 
 trials_file=sys.argv[n]
 scp_file=sys.argv[n+1]
 out_file=sys.argv[n+2]
 
+# load trials and score
 trials=load_data(trials_file,3)
+# scp with `score, filepath` list
 scp=load_data(scp_file,2)
 
 trials_dict={}
@@ -94,8 +96,8 @@ for i in range(0,len(trials)):
 score=[]
 for i in range(0,len(scp)):
     dict={}
-    temp=load_data(scp[i][1],3)
-    for j in range(0,len(temp)):
+    temp = load_data(scp[i][1], 3)
+    for j in range(0, len(temp)):
         if options["label_column"] == "3":
             dict[temp[j][0]+" "+temp[j][1]]=float(temp[j][2]) if not options["normalize"] else sigmoid(float(temp[j][2]))
         elif options["label_column"] == '1':
@@ -104,11 +106,12 @@ for i in range(0,len(scp)):
             raise ValueError("not support")
     score.append(dict)
 
+# x for sys1,sys2,...,sysn score
+# y be one of non-target, target
 x=[]
 y=[]
 w=[]
 print("Transform data to vector...")
-
 for i in range(0,len(trials)):
     if options["label_column"] == "3":
         key = trials[i][0] + " " + trials[i][1]
@@ -125,6 +128,7 @@ for i in range(0,len(trials)):
     else:
         y.append(-1)
         
+# train model
 if(options["confidence"]==True):
     print("Prapare data for CDF computation ...")
     target=[]
@@ -155,8 +159,13 @@ if(options["confidence"]==True):
     print("Computation done.")
         
 else:   
-    print("Train svm model...(it needs some time)...")  
-    model = svm.SVC(kernel='linear', max_iter=-1,C=1,random_state= 777)
+    model = None
+    if options["lda"]==True:
+        print("Train Lda model...(it needs some time)...")  
+        model = LinearDiscriminantAnalysis(solver='svd', n_components=1)
+    elif options["svm"]==True:
+        print("Train svm model...(it needs some time)...")  
+        model = svm.SVC(kernel='linear', max_iter=-1,C=1,random_state= 777)
     model.fit(x,y)
     print("Training done.")
     w=model.coef_[0]
@@ -165,7 +174,8 @@ else:
     if(options["write_weight"]!=""):
         print("write weight to %s..."%(options["write_weight"]))
         txt_w=w.tolist()
-        txt_b=0
+        #txt_b=0
+        txt_b=b
         file=open(options["write_weight"],"w+")
         file.write("[ ")
         for i in range(0,len(txt_w)):
@@ -177,6 +187,7 @@ else:
     print("w =",w,"\nb =",b)
     print("\n")
 
+# apply transform to raw score
 print("Write fusion score to %s..."%(out_file))
 f=open(out_file,"w+")
 
